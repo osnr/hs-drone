@@ -2,21 +2,46 @@ import Network.Socket
 import Control.Concurrent
 import Control.Monad
 
-takeOff s num = send s $ "AT*REF=" ++ show num ++ ",290718208\r"
+data ArDroneMsg = TakeOff | Land
 
-land s num = send s $ "AT*REF=" ++ show num ++ ",290717696\r"
+data AtCommand = AtRef String
 
-main = withSocketsDo $ do
-    addrInfos <- getAddrInfo Nothing (Just "192.168.1.1") (Just "5556")
+type SequenceNumber = Int
+
+runDrone :: String -> [(Int, ArDroneMsg)] -> IO ()
+runDrone ip msgs = do
+    addrInfos <- getAddrInfo Nothing (Just ip) (Just "5556")
     let serverAddr = head addrInfos
 
     sock <- socket (addrFamily serverAddr) Datagram defaultProtocol
     connect sock (addrAddress serverAddr)
 
-    forM_ [1..167] $ \num -> do -- 5 seconds
-        threadDelay 30000 -- 30 ms
-        takeOff sock num
+    let commands :: [(SequenceNumber, AtCommand)]
+        commands = zip [1..] . concat $ do
+            (waitAfterward, msg) <- msgs
+            -- how many times do we send this msg out?
+            -- supposing we send it out every 30 ms
+            let n = waitAfterward `mod` 30
+            -- zip with sequence numbers
+            return . replicate n $ toAtCommand msg
 
-    forM_ [168..168*2] $ \num -> do
+    forM_ commands $ \(num, command) -> do
+        send sock $ fromAtCommand command num
         threadDelay 30000
-        land sock num
+
+main = withSocketsDo $ do
+    runDrone "192.168.1.1" $
+        [ (0, TakeOff)
+        , (3000, Land)
+        ]
+
+toAtCommand :: ArDroneMsg -> AtCommand
+toAtCommand msg =
+    case msg of
+     TakeOff -> AtRef "290718208"
+     Land -> AtRef "290717696"
+
+fromAtCommand :: AtCommand -> Int -> String
+fromAtCommand cmd num =
+    case cmd of
+     AtRef param -> "AT*REF=" ++ show num ++ "," ++ param ++ "\r"
