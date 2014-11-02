@@ -3,8 +3,10 @@ import Control.Concurrent
 import Control.Monad
 
 data ArDroneMsg = TakeOff | Land
+                deriving (Show)
 
 data AtCommand = AtRef String
+               deriving (Show)
 
 type SequenceNumber = Int
 
@@ -21,8 +23,8 @@ runDrone ip msgs = do
             (waitAfterward, msg) <- msgs
             -- how many times do we send this msg out?
             -- supposing we send it out every 30 ms
-            let n = waitAfterward `mod` 30
-            -- zip with sequence numbers
+            let n = traceShow (waitAfterward `div` 30) $ (waitAfterward `div` 30)
+
             return . replicate n $ toAtCommand msg
 
     forM_ commands $ \(num, command) -> do
@@ -31,7 +33,7 @@ runDrone ip msgs = do
 
 main = withSocketsDo $ do
     runDrone "192.168.1.1" $
-        [ (0, TakeOff)
+        [ (3000, TakeOff)
         , (3000, Land)
         ]
 
