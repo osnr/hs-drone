@@ -1,6 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
-module ArDrone where
+module Robotics.ArDrone.Control where
 
 import Network.Socket
 import Control.Concurrent

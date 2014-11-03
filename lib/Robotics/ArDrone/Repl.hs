@@ -1,4 +1,6 @@
-import ArDrone
+module Robotics.ArDrone.Repl where
+
+import Robotics.ArDrone.Control
 
 import Control.Monad
 
