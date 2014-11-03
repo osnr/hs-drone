@@ -1,11 +1,48 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 import Network.Socket
 import Control.Concurrent
 import Control.Monad
 
-data ArDroneMsg = TakeOff | Land
+import Data.List
+
+import Data.Binary.IEEE754
+import Data.Int
+
+import Debug.Trace
+
+data ArDroneMsg = TakeOff
+                | Land
+
+                | Up Float
+                | Down Float
+
+                | Clockwise Float
+                | CounterClockwise Float
+
+                | Front Float
+                | Back Float
+
+                | MoveLeft Float
+                | MoveRight Float
+
+                | Stop
+                | Calibrate
+
+                | Config String String
+
+                | Animate String Int
+
+                | DisableEmergency
                 deriving (Show)
 
 data AtCommand = AtRef String
+               | AtFTrim
+               | AtPCmd { pitch :: Float
+                        , roll :: Float
+                        , gaz :: Float
+                        , yaw :: Float }
+               | AtConfig String String
                deriving (Show)
 
 type SequenceNumber = Int
@@ -23,18 +60,19 @@ runDrone ip msgs = do
             (waitAfterward, msg) <- msgs
             -- how many times do we send this msg out?
             -- supposing we send it out every 30 ms
-            let n = traceShow (waitAfterward `div` 30) $ (waitAfterward `div` 30)
+            let n = waitAfterward `div` 30
 
             return . replicate n $ toAtCommand msg
 
     forM_ commands $ \(num, command) -> do
-        send sock $ fromAtCommand command num
+        send sock $ traceId $ fromAtCommand command num
         threadDelay 30000
 
 main = withSocketsDo $ do
     runDrone "192.168.1.1" $
-        [ (3000, TakeOff)
-        , (3000, Land)
+        [ (6000, TakeOff)
+        , (2000, CounterClockwise 0.5)
+        , (2000, Land)
         ]
 
 toAtCommand :: ArDroneMsg -> AtCommand
@@ -43,7 +81,29 @@ toAtCommand msg =
      TakeOff -> AtRef "290718208"
      Land -> AtRef "290717696"
 
+     Up speed -> AtPCmd 0 0 speed 0
+     Down speed -> AtPCmd 0 0 (-speed) 0
+
+     -- fixme not sure
+     Clockwise speed -> AtPCmd 0 0 0 speed
+     CounterClockwise speed -> AtPCmd 0 0 0 (-speed)
+
+     Front speed -> AtPCmd 0 (-speed) 0 0
+     Back speed -> AtPCmd 0 speed 0 0
+
+     MoveLeft speed -> AtPCmd 0 speed 0 0
+     MoveRight speed -> AtPCmd 0 (-speed) 0 0
+
+     DisableEmergency -> AtRef "290717952"
+
 fromAtCommand :: AtCommand -> Int -> String
 fromAtCommand cmd num =
     case cmd of
      AtRef param -> "AT*REF=" ++ show num ++ "," ++ param ++ "\r"
+     AtPCmd { pitch, roll, gaz, yaw } ->
+         let suffix = intercalate "," . map (show . floatToInt) $
+                      [pitch, roll, gaz, yaw]
+         in "AT*PCMD=" ++ show num ++ ",1," ++ suffix ++ "\r"
+
+floatToInt :: Float -> Int32
+floatToInt = fromIntegral . floatToWord
