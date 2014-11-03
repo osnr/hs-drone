@@ -108,16 +108,16 @@ toAtCommand msg =
      DisableEmergency -> AtRef "290717952"
 
 fromAtCommand :: AtCommand -> Int -> String
-fromAtCommand cmd num =
-    case cmd of
-     AtRef param -> "AT*REF=" ++ show num ++ "," ++ param ++ "\r"
+fromAtCommand cmd num = (++ "\r") $
+   case cmd of
+     AtRef param -> "AT*REF=" ++ show num ++ "," ++ param
 
      AtPCmd { enable, pitch, roll, gaz, yaw } ->
          let enableNum = if enable then "1" else "0"
              suffix = intercalate "," . map (show . floatToInt) $
                       [pitch, roll, gaz, yaw]
          in "AT*PCMD=" ++ show num ++ "," ++
-            enableNum ++ "," ++ suffix ++ "\r"
+            enableNum ++ "," ++ suffix
 
      AtFTrim ->
          "AT*FTRIM=" ++ show num
