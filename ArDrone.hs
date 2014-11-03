@@ -1,5 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
+module ArDrone where
+
 import Network.Socket
 import Control.Concurrent
 import Control.Monad
@@ -8,10 +10,6 @@ import Data.List
 
 import Data.Binary.IEEE754
 import Data.Int
-
-import System.IO.Unsafe
-import Data.IORef
-import Debug.Trace
 
 data ArDroneMsg = TakeOff
                 | Land
@@ -75,7 +73,7 @@ runDrone ip msgs = do
             return . replicate n $ toAtCommand msg
 
     forM_ commands $ \(num, command) -> do
-        send sock $ traceId $ fromAtCommand command num
+        send sock $ fromAtCommand command num
         threadDelay 30000
 
 main = withSocketsDo $ do
@@ -126,32 +124,3 @@ fromAtCommand cmd num =
 
 floatToInt :: Float -> Int32
 floatToInt = fromIntegral . floatToWord
-
--- FOR REPL
------------
-currentCommand :: IORef (Maybe AtCommand)
-{-# NOINLINE currentCommand #-}
-currentCommand = unsafePerformIO (newIORef Nothing)
-
--- for REPL / interleave with other IO
-initDrone :: String -> IO ()
-initDrone ip = do
-    sock <- connectDrone ip
-
-    forkIO . forM_ [1..] $ \num -> do
-        currentCommandM <- readIORef currentCommand
-        case currentCommandM of
-         Nothing -> return ()
-         Just cmd -> do send sock $ fromAtCommand cmd num
-                        return ()
-
-    return ()
-
-initDefaultDrone = initDrone "192.168.1.1"
-
-now :: ArDroneMsg -> IO ()
-now = writeIORef currentCommand . Just . toAtCommand
-
-[takeOff, land, stop, fTrim, disableEmergency] = map now [TakeOff, Land,  Stop, FTrim, DisableEmergency]
-
-[up, down, cw, ccw, front, back, left, right] = map (now .) [Up, Down, Clockwise, CounterClockwise, Front, Back, MoveLeft, MoveRight]
